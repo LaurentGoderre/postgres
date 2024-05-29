@@ -47,7 +47,7 @@ RUN set -eux; \
 		$DOCKER_PG_LLVM_DEPS \
 		bison \
 		coreutils \
-		docbook-xsl \
+		docbook-xml \
 		dpkg-dev dpkg \
 		flex \
 		g++ \
@@ -124,10 +124,25 @@ RUN set -eux; \
 		--with-lz4 \
 		--with-zstd \
 	; \
+	wget -O docbook-xsl.tar.bz2  https://sourceforge.net/projects/docbook/files/docbook-xsl/1.79.1/docbook-xsl-1.79.1.tar.bz2; \
+	docbookdir="/etc/xml/docbook"; \
+	catalogdir="/etc/xml/catalog"; \
+	mkdir -p ${docbookdir}; \
+	tar \
+			--extract \
+			--file docbook-xsl.tar.bz2 \
+			--directory ${docbookdir} \
+			--strip-components 1; \
+	if [ ! -f /etc/xml/catalog ]; then \
+        xmlcatalog --noout --create /etc/xml/catalog; \
+	fi; \
+	for rewrite in rewriteSystem rewriteURI; do \
+		xmlcatalog --noout --add "$rewrite" "http://docbook.sourceforge.net/release/xsl/current" "file://${docbookdir}" "${catalogdir}"; \
+	done; \
 	make -j "$(nproc)" world; \
-	# TODO: Figure out why man pages aren't generated
-	# https://github.com/docker-library/postgres/actions/runs/9271070104/job/25505640101?pr=1244
-	make install; \
+	rm -rf ${docbookdir}; \
+	xmlcatalog --noout --del "file://${docbookdir}" "${catalogdir}"; \
+	make install-world; \
 	make -C contrib install; \
 	\
 	runDeps="$( \
